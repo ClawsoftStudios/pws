@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+
+Name: pws
+Description: purrfect web sockets
+Version: @PWS_VERSION@
+Libs: -L${libdir} -l@PWS_LIB_NAME@@PWS_LIB_NAME_SUFFIX@
+Cflags: -I${includedir}
