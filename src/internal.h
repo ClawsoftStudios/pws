@@ -40,8 +40,8 @@ typedef struct _Pws_Frame {
   char payload[];
 } _Pws_Frame;
 
-Pws_Connection _pws_recv_frame(Pws *pws, _Pws_Frame **frame);
-Pws_Connection _pws_send_frame(Pws *pws, _Pws_Frame *frame);
+Pws_Connection _pws_recv_frame(Pws *pws, void *userPtr, _Pws_Frame **frame);
+Pws_Connection _pws_send_frame(Pws *pws, void *userPtr, _Pws_Frame *frame);
 
 _Pws_Frame *_pws_create_frame(const Pws *pws, _Pws_Frame_Flags flags, Pws_Opcode opcode, size_t length);
 void _pws_free_frame(const Pws *pws, _Pws_Frame *frame);

@@ -21,7 +21,7 @@ void _pws_free_frame(const Pws *pws, _Pws_Frame *frame) {
 
 
 
-Pws_Connection _pws_recv_frame(Pws *pws, _Pws_Frame **frame) {
+Pws_Connection _pws_recv_frame(Pws *pws, void *userPtr, _Pws_Frame **frame) {
   assert(pws && frame);
   assert(pws->connection == PWS_CONNECTION_OPEN);
 
@@ -31,7 +31,7 @@ Pws_Connection _pws_recv_frame(Pws *pws, _Pws_Frame **frame) {
   _Pws_Dynamic_Buffer recvBuffer = {0};
   _pws_dynamic_buffer_resize(pws, &recvBuffer, 256);
 
-  int receivedCount = pws->recv(pws->userPtr, recvBuffer.data, recvBuffer.capacity);
+  int receivedCount = pws->recv(userPtr, recvBuffer.data, recvBuffer.capacity);
   if (receivedCount <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
   recvBuffer.count = receivedCount;
 
@@ -77,7 +77,7 @@ Pws_Connection _pws_recv_frame(Pws *pws, _Pws_Frame **frame) {
   recvBuffer.count = 0;
 
   while (recvBuffer.count < recvBuffer.capacity) {
-    receivedCount = pws->recv(pws->userPtr, &recvBuffer.data[recvBuffer.count], recvBuffer.capacity-recvBuffer.count);
+    receivedCount = pws->recv(userPtr, &recvBuffer.data[recvBuffer.count], recvBuffer.capacity-recvBuffer.count);
     if (receivedCount <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
 
     for (size_t i = 0; i < (size_t)receivedCount; ++i) recvBuffer.data[recvBuffer.count+i] ^= maskingKey[(j++) % 4];
@@ -96,7 +96,7 @@ defer:
   return (pws->connection = deferValue);
 }
 
-Pws_Connection _pws_send_frame(Pws *pws, _Pws_Frame *frame) {
+Pws_Connection _pws_send_frame(Pws *pws, void *userPtr, _Pws_Frame *frame) {
   assert(pws && frame);
   assert(pws->connection == PWS_CONNECTION_OPEN);
 
@@ -137,7 +137,7 @@ Pws_Connection _pws_send_frame(Pws *pws, _Pws_Frame *frame) {
 
   size_t sent = 0;
   while (sent < sendBuffer.count) {
-    int s = pws->send(pws->userPtr, &sendBuffer.data[sent], sendBuffer.count-sent);
+    int s = pws->send(userPtr, &sendBuffer.data[sent], sendBuffer.count-sent);
     if (s <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
     sent += s;
   }

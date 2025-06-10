@@ -17,7 +17,7 @@ Sec-WebSocket-Protocol: chat
 #include <string.h>
 #include <assert.h>
 
-Pws_Connection pws_connect(Pws *pws, Pws_Connect_Info connectInfo) {
+Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo) {
   assert(pws);
 
   Pws_Connection deferValue = PWS_CONNECTION_OPEN;
@@ -38,9 +38,9 @@ Pws_Connection pws_connect(Pws *pws, Pws_Connect_Info connectInfo) {
   int n = sprintf(buffer, handshakeFormat, connectInfo.path, connectInfo.host, connectInfo.origin);
   if (n < 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
 
-  assert(pws->send(pws->userPtr, buffer, n) == n);
+  assert(pws->send(userPtr, buffer, n) == n);
 
-  n = pws->recv(pws->userPtr, buffer, BUFFER_CAPACITY);
+  n = pws->recv(userPtr, buffer, BUFFER_CAPACITY);
   if (n < 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
 
   if (strncmp(buffer, "HTTP/1.1 101 Switching Protocols\r\n", 34) != 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
@@ -49,7 +49,7 @@ defer:
   return (pws->connection = deferValue);
 }
 
-Pws_Connection pws_recv_message(Pws *pws, Pws_Message **message) {
+Pws_Connection pws_recv_message(Pws *pws, void *userPtr, Pws_Message **message) {
   assert(pws && message);
   assert(pws->connection == PWS_CONNECTION_OPEN);
 
@@ -60,11 +60,11 @@ Pws_Connection pws_recv_message(Pws *pws, Pws_Message **message) {
 
   _Pws_Frame *frame = NULL;
   while (!frame || !(frame->flags & _PWS_FRAME_FLAG_FIN)) {
-    if (!_pws_recv_frame(pws, &frame)) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
+    if (!_pws_recv_frame(pws, userPtr, &frame)) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
     if (!opcode) {
-      if (!frame->opcode) return pws_close(pws, 1002); // Protocol error
+      if (!frame->opcode) return pws_close(pws, userPtr, 1002); // Protocol error
       opcode = frame->opcode;
-    } else if (frame->opcode) return pws_close(pws, 1002); // Protocol error
+    } else if (frame->opcode) return pws_close(pws, userPtr, 1002); // Protocol error
 
     _pws_dynamic_buffer_append_many(pws, &messageBuffer, frame->payload, frame->length);
   }
@@ -78,7 +78,7 @@ defer:
   return (pws->connection = deferValue);
 }
 
-Pws_Connection pws_send_message(Pws *pws, Pws_Message *message) {
+Pws_Connection pws_send_message(Pws *pws, void *userPtr, Pws_Message *message) {
   assert(pws && message);
   assert(pws->connection == PWS_CONNECTION_OPEN);
 
@@ -86,24 +86,24 @@ Pws_Connection pws_send_message(Pws *pws, Pws_Message *message) {
   assert(frame);
   memcpy(frame->payload, message->payload, message->length);
 
-  Pws_Connection connection = _pws_send_frame(pws, frame);
+  Pws_Connection connection = _pws_send_frame(pws, userPtr, frame);
   _pws_free_frame(pws, frame);
   return (pws->connection = connection);
 }
 
-Pws_Connection pws_close(Pws *pws, uint16_t statusCode) {
+Pws_Connection pws_close(Pws *pws, void *userPtr, uint16_t statusCode) {
   assert(pws);
   assert(pws->connection == PWS_CONNECTION_OPEN);
 
-  _Pws_Frame *frame = _pws_create_frame(pws, _PWS_FRAME_FLAG_FIN, PWS_OPCODE_CLOSE, statusCode?2:0);
-  assert(frame);
+  Pws_Message *message = pws_create_message(pws, PWS_OPCODE_CLOSE, statusCode?2:0);
+  assert(message);
 
   if (statusCode) {
-    frame->payload[0] = (statusCode>>8) & 0xFF;
-    frame->payload[1] = (statusCode>>0) & 0xFF;
+    message->payload[0] = (statusCode>>8) & 0xFF;
+    message->payload[1] = (statusCode>>0) & 0xFF;
   }
 
-  if (!_pws_send_frame(pws, frame)) return pws->connection = PWS_CONNECTION_CONNECTING;
+  if (!pws_send_message(pws, userPtr, message)) return pws->connection = PWS_CONNECTION_CONNECTING;
 
   return pws->connection = PWS_CONNECTION_CONNECTING;
 }

@@ -54,7 +54,6 @@ typedef struct Pws {
   Pws_Type type;
   Pws_Allocator *allocator;
 
-  void *userPtr;
   Pws_Send send;
   Pws_Recv recv;
 
@@ -67,13 +66,13 @@ typedef struct Pws_Connect_Info {
   const char *path;
 } Pws_Connect_Info;
 
-Pws_Connection pws_connect(Pws *pws, Pws_Connect_Info connectInfo);
+Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo);
 // TODO: Add support for servers
 
-Pws_Connection pws_recv_message(Pws *pws, Pws_Message **message);
-Pws_Connection pws_send_message(Pws *pws, Pws_Message *message);
+Pws_Connection pws_recv_message(Pws *pws, void *userPtr, Pws_Message **message);
+Pws_Connection pws_send_message(Pws *pws, void *userPtr, Pws_Message *message);
 
-Pws_Connection pws_close(Pws *pws, uint16_t statusCode);
+Pws_Connection pws_close(Pws *pws, void *userPtr, uint16_t statusCode);
 
 Pws_Message *pws_create_message(const Pws *pws, Pws_Opcode opcode, size_t length);
 void pws_free_message(const Pws *pws, Pws_Message *message);
