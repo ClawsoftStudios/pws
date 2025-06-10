@@ -83,6 +83,8 @@ Pws_Connection pws_connect(Pws *pws, Pws_Connect_Info connectInfo);
 Pws_Connection pws_recv_frame(Pws *pws, Pws_Frame **frame);
 Pws_Connection pws_send_frame(Pws *pws, Pws_Frame *frame);
 
+Pws_Connection pws_close(Pws *pws, uint16_t statusCode);
+
 Pws_Frame *pws_create_frame(const Pws *pws, size_t payloadLen);
 void pws_free_frame(const Pws *pws, Pws_Frame *frame);
 

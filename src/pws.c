@@ -187,6 +187,25 @@ defer:
   return (pws->connection = deferValue);
 }
 
+Pws_Connection pws_close(Pws *pws, uint16_t statusCode) {
+  assert(pws);
+  assert(pws->connection == PWS_CONNECTION_OPEN);
+
+  Pws_Frame *frame = pws_create_frame(pws, statusCode?2:0);
+  assert(frame);
+  frame->flags |= PWS_FRAME_FLAG_FIN;
+  frame->opcode = PWS_FRAME_OPCODE_CLOSE;
+
+  if (statusCode) {
+    frame->payload[0] = (statusCode>>8) & 0xFF;
+    frame->payload[1] = (statusCode>>0) & 0xFF;
+  }
+
+  if (!pws_send_frame(pws, frame)) return pws->connection = PWS_CONNECTION_CONNECTING;
+
+  return pws->connection = PWS_CONNECTION_CONNECTING;
+}
+
 
 
 Pws_Frame *pws_create_frame(const Pws *pws, size_t payloadLen) {
