@@ -5,30 +5,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum Pws_Frame_Opcode {
-  PWS_FRAME_OPCODE_CONTINUATION = 0x00,
-  PWS_FRAME_OPCODE_TEXT = 0x01,
-  PWS_FRAME_OPCODE_BINARY = 0x02,
-  PWS_FRAME_OPCODE_CLOSE = 0x08,
-  PWS_FRAME_OPCODE_PING = 0x09,
-  PWS_FRAME_OPCODE_PONG = 0x0A,
-} Pws_Frame_Opcode;
+typedef enum Pws_Opcode {
+  PWS_OPCODE_CONTINUATION = 0x00,
+  PWS_OPCODE_TEXT = 0x01,
+  PWS_OPCODE_BINARY = 0x02,
+  PWS_OPCODE_CLOSE = 0x08,
+  PWS_OPCODE_PING = 0x09,
+  PWS_OPCODE_PONG = 0x0A,
+} Pws_Opcode;
 
-typedef enum Pws_Frame_Flag_Bits {
-  PWS_FRAME_FLAG_RSV3 = (1<<0),
-  PWS_FRAME_FLAG_RSV2 = (1<<1),
-  PWS_FRAME_FLAG_RSV1 = (1<<2),
-  PWS_FRAME_FLAG_FIN  = (1<<3)
-} Pws_Frame_Flag_Bits;
-
-typedef uint8_t Pws_Frame_Flags;
-
-typedef struct Pws_Frame {
-  Pws_Frame_Flags flags : 4;
-  Pws_Frame_Opcode opcode : 4;
-  size_t payloadLen;
+typedef struct Pws_Message {
+  Pws_Opcode opcode;
+  size_t length;
   char payload[];
-} Pws_Frame;
+} Pws_Message;
 
 
 
@@ -80,12 +70,12 @@ typedef struct Pws_Connect_Info {
 Pws_Connection pws_connect(Pws *pws, Pws_Connect_Info connectInfo);
 // TODO: Add support for servers
 
-Pws_Connection pws_recv_frame(Pws *pws, Pws_Frame **frame);
-Pws_Connection pws_send_frame(Pws *pws, Pws_Frame *frame);
+Pws_Connection pws_recv_message(Pws *pws, Pws_Message **message);
+Pws_Connection pws_send_message(Pws *pws, Pws_Message *message);
 
 Pws_Connection pws_close(Pws *pws, uint16_t statusCode);
 
-Pws_Frame *pws_create_frame(const Pws *pws, size_t payloadLen);
-void pws_free_frame(const Pws *pws, Pws_Frame *frame);
+Pws_Message *pws_create_message(const Pws *pws, Pws_Opcode opcode, size_t length);
+void pws_free_message(const Pws *pws, Pws_Message *message);
 
 #endif // _PWS_H_
