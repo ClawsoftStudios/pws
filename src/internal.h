@@ -22,7 +22,8 @@ typedef struct _Pws_Dynamic_Buffer {
 void _pws_dynamic_buffer_free(const Pws *pws, _Pws_Dynamic_Buffer *buffer);
 void _pws_dynamic_buffer_resize(const Pws *pws, _Pws_Dynamic_Buffer *buffer, size_t newCapacity);
 void _pws_dynamic_buffer_append(const Pws *pws, _Pws_Dynamic_Buffer *buffer, char byte);
-void _pws_dynamic_buffer_append_many(const Pws *pws, _Pws_Dynamic_Buffer *buffer, char *bytes, size_t length);
+void _pws_dynamic_buffer_append_many(const Pws *pws, _Pws_Dynamic_Buffer *buffer, const char *bytes, size_t length);
+void _pws_dynamic_buffer_append_cstr(const Pws *pws, _Pws_Dynamic_Buffer *buffer, const char *cstr);
 
 typedef enum _Pws_Frame_Flag_Bits {
   _PWS_FRAME_FLAG_RSV3 = (1<<0),

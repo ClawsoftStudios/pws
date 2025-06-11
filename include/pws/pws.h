@@ -67,7 +67,7 @@ typedef struct Pws_Connect_Info {
 } Pws_Connect_Info;
 
 Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo);
-// TODO: Add support for servers
+Pws_Connection pws_accept(Pws *pws, void *userPtr);
 
 Pws_Connection pws_recv_message(Pws *pws, void *userPtr, Pws_Message **message);
 Pws_Connection pws_send_message(Pws *pws, void *userPtr, Pws_Message *message);

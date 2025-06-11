@@ -26,7 +26,7 @@ void _pws_dynamic_buffer_append(const Pws *pws, _Pws_Dynamic_Buffer *buffer, cha
   buffer->data[buffer->count++] = byte;
 }
 
-void _pws_dynamic_buffer_append_many(const Pws *pws, _Pws_Dynamic_Buffer *buffer, char *bytes, size_t length) {
+void _pws_dynamic_buffer_append_many(const Pws *pws, _Pws_Dynamic_Buffer *buffer, const char *bytes, size_t length) {
   if (buffer->count+length > buffer->capacity) {
     do {
       _pws_dynamic_buffer_resize(pws, buffer, buffer->capacity ? (buffer->capacity << 1) : 32);
@@ -35,4 +35,8 @@ void _pws_dynamic_buffer_append_many(const Pws *pws, _Pws_Dynamic_Buffer *buffer
 
   memcpy(&buffer->data[buffer->count], bytes, length);
   buffer->count += length;
+}
+
+void _pws_dynamic_buffer_append_cstr(const Pws *pws, _Pws_Dynamic_Buffer *buffer, const char *cstr) {
+  _pws_dynamic_buffer_append_many(pws, buffer, cstr, strlen(cstr));
 }

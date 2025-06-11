@@ -22,29 +22,36 @@ Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo
 
   Pws_Connection deferValue = PWS_CONNECTION_OPEN;
 
-  const char *handshakeFormat = // TODO: Use better way of creating handshake request
-    "GET %s HTTP/1.1\r\n"
-    "Host: %s\r\n"
-    "Upgrade: websocket\r\n"
-    "Connection: Upgrade\r\n"
-    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-    "Origin: %s\r\n"
-    "Sec-WebSocket-Protocol: chat, superchat\r\n"
-    "Sec-WebSocket-Version: 13\r\n\r\n";
+  _Pws_Dynamic_Buffer buffer = {0};
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "GET ");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, connectInfo.path);
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, " HTTP/1.1\r\nHost: ");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, connectInfo.host);
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "\r\nUpgrade: websocket\r\nConnection: Upgrade");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "\r\nSec-Websocket-Key: dGhlIHNhbXBsZSBub25jZQ==");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "\r\nOrigin: ");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, connectInfo.origin);
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "\r\nSec-Websocket-Protocol: chat, superchat");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "\r\nSec-Websocket-Version: 13");
+  _pws_dynamic_buffer_append_cstr(pws, &buffer, "\r\n\r\n");
 
-  enum { BUFFER_CAPACITY = 2048 };
+  size_t sent = 0;
+  while (sent < buffer.count) {
+    int n = pws->send(userPtr, buffer.data, buffer.count);
+    if (n <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
+    sent += n;
+  }
 
-  char buffer[BUFFER_CAPACITY];
-  int n = sprintf(buffer, handshakeFormat, connectInfo.path, connectInfo.host, connectInfo.origin);
-  if (n < 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
+  buffer.count = 0;
+  _pws_dynamic_buffer_resize(pws, &buffer, 1024);
 
-  assert(pws->send(userPtr, buffer, n) == n);
+  while (buffer.count < 4 || memcmp(&buffer.data[buffer.count-4], "\r\n\r\n", 4)) {
+    int n = pws->recv(userPtr, buffer.data, buffer.capacity-buffer.count);
+    if (n < 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
+    buffer.count += n;
+  }
 
-  n = pws->recv(userPtr, buffer, BUFFER_CAPACITY);
-  if (n < 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
-
-  if (strncmp(buffer, "HTTP/1.1 101 Switching Protocols\r\n", 34) != 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
-
+  if (strncmp(buffer.data, "HTTP/1.1 101 Switching Protocols\r\n", 34) != 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
 defer:
   return (pws->connection = deferValue);
 }
