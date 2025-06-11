@@ -4,6 +4,10 @@
 #include <string.h>
 #include <assert.h>
 
+#ifndef min
+#define min(a, b) ((a)<(b))?(a):(b)
+#endif
+
 _Pws_Frame *_pws_create_frame(const Pws *pws, _Pws_Frame_Flags flags, Pws_Opcode opcode, size_t length) {
   _Pws_Frame *frame = _pws_alloc(pws, sizeof(*frame) + length);
   if (!frame) return NULL;
@@ -31,9 +35,18 @@ Pws_Connection _pws_recv_frame(Pws *pws, void *userPtr, _Pws_Frame **frame) {
   _Pws_Dynamic_Buffer recvBuffer = {0};
   _pws_dynamic_buffer_resize(pws, &recvBuffer, 256);
 
-  int receivedCount = pws->recv(userPtr, recvBuffer.data, recvBuffer.capacity);
-  if (receivedCount <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
-  recvBuffer.count = receivedCount;
+  if (pws->leftovers.count) {
+    _pws_dynamic_buffer_append_many(pws, &recvBuffer, pws->leftovers.buffer, pws->leftovers.count);
+    free(pws->leftovers.buffer);
+    pws->leftovers.count = 0;
+    pws->leftovers.buffer = NULL;
+  }
+
+  int receivedCount = 0;
+  if (recvBuffer.count < 2) {
+    if ((receivedCount = pws->recv(userPtr, recvBuffer.data, recvBuffer.capacity)) <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
+    recvBuffer.count = receivedCount;
+  }
 
   if (recvBuffer.count < 2) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
 
@@ -70,26 +83,29 @@ Pws_Connection _pws_recv_frame(Pws *pws, void *userPtr, _Pws_Frame **frame) {
     for (size_t i = offset; i < recvBuffer.count; ++i) recvBuffer.data[i] ^= maskingKey[(j++) % 4];
   }
 
-  size_t payloadSize = recvBuffer.count-offset;
+  size_t payloadSize = min(recvBuffer.count-offset, payloadLength);
   memcpy(newFrame->payload, &recvBuffer.data[offset], payloadSize);
 
-  _pws_dynamic_buffer_resize(pws, &recvBuffer, (payloadLength-payloadSize));
-  recvBuffer.count = 0;
+  if (recvBuffer.count-offset > payloadLength) {
+    pws->leftovers.count = recvBuffer.count-offset-payloadLength;
+    pws->leftovers.buffer = malloc(pws->leftovers.count);
+    memcpy(pws->leftovers.buffer, &recvBuffer.data[offset+payloadLength], pws->leftovers.count);
+  } else {
+    _pws_dynamic_buffer_resize(pws, &recvBuffer, (payloadLength-payloadSize));
+    recvBuffer.count = 0;
 
-  while (recvBuffer.count < recvBuffer.capacity) {
-    receivedCount = pws->recv(userPtr, &recvBuffer.data[recvBuffer.count], recvBuffer.capacity-recvBuffer.count);
-    if (receivedCount <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
+    while (recvBuffer.count < recvBuffer.capacity) {
+      receivedCount = pws->recv(userPtr, &recvBuffer.data[recvBuffer.count], recvBuffer.capacity-recvBuffer.count);
+      if (receivedCount <= 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
 
-    for (size_t i = 0; i < (size_t)receivedCount; ++i) recvBuffer.data[recvBuffer.count+i] ^= maskingKey[(j++) % 4];
-    recvBuffer.count += receivedCount;
+      for (size_t i = 0; i < (size_t)receivedCount; ++i) recvBuffer.data[recvBuffer.count+i] ^= maskingKey[(j++) % 4];
+      recvBuffer.count += receivedCount;
+    }
+
+    memcpy(&newFrame->payload[payloadSize], recvBuffer.data, recvBuffer.count);
   }
 
-  memcpy(&newFrame->payload[payloadSize], recvBuffer.data, recvBuffer.count);
-
-  _pws_dynamic_buffer_free(pws, &recvBuffer);
-
   *frame = newFrame;
-
 defer:
   _pws_dynamic_buffer_free(pws, &recvBuffer);
   if (deferValue == PWS_CONNECTION_CONNECTING) _pws_free_frame(pws, newFrame);

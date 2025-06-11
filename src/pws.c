@@ -17,6 +17,20 @@ Sec-WebSocket-Protocol: chat
 #include <string.h>
 #include <assert.h>
 
+static const char *strnstr(const char *haystack, const char *needle, size_t length) {
+  size_t needleLen = strlen(needle);
+  if (!needleLen) return haystack;
+
+  for (int i = 0; i <= (int)(length-needleLen); ++i) {
+    if ((haystack[0] == needle[0]) && !strncmp(haystack, needle, needleLen)) return haystack;
+    ++haystack;
+  }
+
+  return NULL;
+}
+
+
+
 Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo) {
   assert(pws);
 
@@ -43,12 +57,28 @@ Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo
   }
 
   buffer.count = 0;
-  _pws_dynamic_buffer_resize(pws, &buffer, 1024);
+  buffer.capacity = 1<<(8-1);
 
-  while (buffer.count < 4 || memcmp(&buffer.data[buffer.count-4], "\r\n\r\n", 4)) {
-    int n = pws->recv(userPtr, buffer.data, buffer.capacity-buffer.count);
+  if (pws->leftovers.buffer) {
+    _pws_dynamic_buffer_append_many(pws, &buffer, pws->leftovers.buffer, pws->leftovers.count);
+    free(pws->leftovers.buffer);
+    pws->leftovers.count = 0;
+    pws->leftovers.buffer = NULL;
+  }
+
+  const char *ptr = NULL;
+  while (buffer.count < 4 || !(ptr = strnstr(buffer.data, "\r\n\r\n", buffer.count))) {
+    _pws_dynamic_buffer_resize(pws, &buffer, buffer.capacity << 1);
+    int n = pws->recv(userPtr, &buffer.data[buffer.count], buffer.capacity-buffer.count);
     if (n < 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
     buffer.count += n;
+  }
+
+  ptr += 4;
+  if (buffer.count-(ptr-buffer.data)) {
+    pws->leftovers.count = buffer.count-(ptr-buffer.data);
+    pws->leftovers.buffer = malloc(pws->leftovers.count);
+    memcpy(pws->leftovers.buffer, &buffer.data[ptr-buffer.data], pws->leftovers.count);
   }
 
   if (strncmp(buffer.data, "HTTP/1.1 101 Switching Protocols\r\n", 34) != 0) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
@@ -79,6 +109,8 @@ Pws_Connection pws_recv_message(Pws *pws, void *userPtr, Pws_Message **message) 
   Pws_Message *msg = pws_create_message(pws, opcode, messageBuffer.count);
   assert(msg);
   memcpy(msg->payload, messageBuffer.data, messageBuffer.count);
+
+  *message = msg;
 defer:
   _pws_dynamic_buffer_free(pws, &messageBuffer);
 

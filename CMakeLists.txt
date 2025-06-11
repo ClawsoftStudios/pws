@@ -22,7 +22,7 @@ target_compile_options(pws PRIVATE
   $<$<AND:$<CONFIG:Debug>,$<C_COMPILER_ID:MSVC>>:/W4 /WX>
 )
 
-# add_subdirectory(example/)
+add_subdirectory(sandbox/)
 
 
 
