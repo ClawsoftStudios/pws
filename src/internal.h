@@ -41,6 +41,8 @@ typedef struct _Pws_Frame {
   char payload[];
 } _Pws_Frame;
 
+Pws_Connection _pws_error(Pws *pws, void *userPtr, uint16_t status, const char *payloadCstr);
+
 Pws_Connection _pws_recv_frame(Pws *pws, void *userPtr, _Pws_Frame **frame);
 Pws_Connection _pws_send_frame(Pws *pws, void *userPtr, _Pws_Frame *frame);
 

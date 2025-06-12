@@ -99,9 +99,9 @@ Pws_Connection pws_recv_message(Pws *pws, void *userPtr, Pws_Message **message) 
   while (!frame || !(frame->flags & _PWS_FRAME_FLAG_FIN)) {
     if (!_pws_recv_frame(pws, userPtr, &frame)) DEFER_RETURN(PWS_CONNECTION_CONNECTING);
     if (!opcode) {
-      if (!frame->opcode) return pws_close(pws, userPtr, 1002); // Protocol error
+      if (!frame->opcode) return _pws_error(pws, userPtr, 1002, "opcode of first frame in a message must not be set to continuation"); // Protocol error
       opcode = frame->opcode;
-    } else if (frame->opcode) return pws_close(pws, userPtr, 1002); // Protocol error
+    } else if (frame->opcode) return _pws_error(pws, userPtr, 1002, "opcode of n-th frame in a message must be set to continuation"); // Protocol error
 
     _pws_dynamic_buffer_append_many(pws, &messageBuffer, frame->payload, frame->length);
   }
@@ -127,24 +127,9 @@ Pws_Connection pws_send_message(Pws *pws, void *userPtr, Pws_Message *message) {
 
   Pws_Connection connection = _pws_send_frame(pws, userPtr, frame);
   _pws_free_frame(pws, frame);
+  if (message->opcode == PWS_OPCODE_CLOSE) connection = PWS_CONNECTION_CONNECTING;
+
   return (pws->connection = connection);
-}
-
-Pws_Connection pws_close(Pws *pws, void *userPtr, uint16_t statusCode) {
-  assert(pws);
-  assert(pws->connection == PWS_CONNECTION_OPEN);
-
-  Pws_Message *message = pws_create_message(pws, PWS_OPCODE_CLOSE, statusCode?2:0);
-  assert(message);
-
-  if (statusCode) {
-    message->payload[0] = (statusCode>>8) & 0xFF;
-    message->payload[1] = (statusCode>>0) & 0xFF;
-  }
-
-  if (!pws_send_message(pws, userPtr, message)) return pws->connection = PWS_CONNECTION_CONNECTING;
-
-  return pws->connection = PWS_CONNECTION_CONNECTING;
 }
 
 
@@ -159,6 +144,33 @@ Pws_Message *pws_create_message(const Pws *pws, Pws_Opcode opcode, size_t length
   return message;
 }
 
+Pws_Message *pws_create_close_message(const Pws *pws, uint16_t status, size_t length, const char *payload) {
+  Pws_Message *message = _pws_alloc(pws, sizeof(*message) + length);
+  if (!message) return NULL;
+  memset(message, 0, sizeof(*message));
+  message->opcode = PWS_OPCODE_CLOSE;
+  message->length = length+2;
+
+  message->payload[0] = (status>>8) & 0xFF;
+  message->payload[1] = (status>>0) & 0xFF;
+
+  if (length) memcpy(&message->payload[2], payload, length);
+
+  return message;
+}
+
 void pws_free_message(const Pws *pws, Pws_Message *message) {
   _pws_free(pws, message);
+}
+
+
+
+Pws_Connection _pws_error(Pws *pws, void *userPtr, uint16_t status, const char *payloadCstr) {
+  assert(pws);
+
+  Pws_Message *message = pws_create_close_message(pws, status, strlen(payloadCstr), payloadCstr);
+  (void)pws_send_message(pws, userPtr, message);
+  pws_free_message(pws, message);
+
+  return (pws->connection = PWS_CONNECTION_CONNECTING);
 }

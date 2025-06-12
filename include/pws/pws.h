@@ -77,9 +77,8 @@ Pws_Connection pws_connect(Pws *pws, void *userPtr, Pws_Connect_Info connectInfo
 Pws_Connection pws_recv_message(Pws *pws, void *userPtr, Pws_Message **message);
 Pws_Connection pws_send_message(Pws *pws, void *userPtr, Pws_Message *message);
 
-Pws_Connection pws_close(Pws *pws, void *userPtr, uint16_t statusCode);
-
 Pws_Message *pws_create_message(const Pws *pws, Pws_Opcode opcode, size_t length);
+Pws_Message *pws_create_close_message(const Pws *pws, uint16_t status, size_t length, const char *payload);
 void pws_free_message(const Pws *pws, Pws_Message *message);
 
 #endif // _PWS_H_
