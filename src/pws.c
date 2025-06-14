@@ -117,7 +117,7 @@ defer:
   return (pws->connection = deferValue);
 }
 
-Pws_Connection pws_send_message(Pws *pws, void *userPtr, Pws_Message *message) {
+Pws_Connection pws_send_message(Pws *pws, void *userPtr, const Pws_Message *message) {
   assert(pws && message);
   assert(pws->connection == PWS_CONNECTION_OPEN);
 
